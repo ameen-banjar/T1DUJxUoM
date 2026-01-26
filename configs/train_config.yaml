@@ -1,0 +1,12 @@
+training:
+  batch_size: 64
+  learning_rate: 0.001
+  epochs: 50
+  loss: "MSE"
+  optimizer: "Adam"
+  
+model:
+  type: "LSTM"
+  hidden_dim: 128
+  num_layers: 2
+  dropout: 0.1

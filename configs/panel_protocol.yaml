@@ -1,0 +1,10 @@
+protocol:
+  warmup_minutes: 360
+  forecast_minutes: 360
+
+scenarios:
+  A_Baseline: "No change"
+  B_Fasting: "Zero carbs, Zero bolus"
+  C_Meal50g_Bolus: "50g Carbs + Standard Bolus"
+  D_Meal50g_NoBolus: "50g Carbs + No Bolus (Missed)"
+  E_Meal50g_OverBolus: "50g Carbs + 1.5x Bolus (Overdose)"

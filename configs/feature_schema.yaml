@@ -1,0 +1,28 @@
+schema:
+  name: T1DUJxUoM_FeatureSchema_2301
+  version: 1.0.0
+
+timebase:
+  step_minutes: 5
+  seq_len_steps: 72
+
+target:
+  name: glucose_mgdl
+  scaler_stats:
+    mean: 149.7158
+    std: 49.4592
+
+features:
+  feature_order:
+    - glucose_mgdl
+    - input_insulin
+    - input_meal_carbs
+    - IOB_U
+    - COB_g
+    - heart_rate
+    - steps
+    - sleep_efficiency
+    - feat_hour_of_day_sin
+    - feat_hour_of_day_cos
+    - feat_is_weekend
+    - heart_rate_WRTbaseline
