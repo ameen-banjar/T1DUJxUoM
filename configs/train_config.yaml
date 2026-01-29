@@ -5,6 +5,11 @@ training:
   loss: "MSE"
   optimizer: "Adam"
   
+  # Physics-Guided Training Settings
+  physics_guided: true       # Enable the physics-based methodology
+  mask_probability: 0.90     # Glucose masking probability (The key secret)
+  augmentation_factor: 20    # Factor for physics-based data augmentation
+
 model:
   type: "LSTM"
   hidden_dim: 128
