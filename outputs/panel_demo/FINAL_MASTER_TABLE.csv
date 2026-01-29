@@ -1,0 +1,10 @@
+Patient ID,Meal Impact (mg/dL),Insulin Effect (mg/dL),Safety Drop (mg/dL),Phenotype
+2301,0.0,-0.27,-0.08,Responder (Weak)
+2305,5.07,-0.01,-0.0,Responder (Weak)
+2306,2.84,0.07,0.04,Resistant/Paradoxical
+2307,34.23,0.24,0.11,Resistant/Paradoxical
+2308,27.15,0.17,0.29,Resistant/Paradoxical
+2309,0.0,-0.82,-0.12,Responder (Weak)
+2320,4.81,-20.0,-8.09,Responder (Effective)
+2401,11.89,-21.98,-15.11,Responder (Effective)
+2404,-0.05,1.49,0.84,Resistant/Paradoxical
