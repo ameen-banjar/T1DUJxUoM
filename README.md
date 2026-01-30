@@ -3,7 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Paper Status](https://img.shields.io/badge/Paper-Under_Review-orange.svg)](https://github.com/)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18380842.svg)](https://doi.org/10.5281/zenodo.18380842)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18434352.svg)](https://doi.org/10.5281/zenodo.18434352)
 
 **Authors:**
 - **Ameen Banjar** (University of Jeddah, Saudi Arabia)
