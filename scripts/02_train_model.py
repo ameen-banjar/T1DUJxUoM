@@ -1,6 +1,7 @@
 import os
 import sys
 import yaml
+import json  # <--- FIXED: Added missing import
 import joblib
 import numpy as np
 import pandas as pd
@@ -11,7 +12,6 @@ from torch.utils.data import DataLoader, Dataset
 from sklearn.preprocessing import RobustScaler
 
 # --- SETUP PATHS ---
-# Handle path logic for both Jupyter and Script execution
 try:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
@@ -172,7 +172,7 @@ def train_pipeline():
     if use_physics:
         aug_factor = CONFIG['training'].get('augmentation_factor', 10)
         mask_p = CONFIG['training'].get('mask_probability', 0.5)
-        # Apply Flooding (FIXED ARGUMENT NAME HERE)
+        # Apply Flooding
         X_train, y_train = augment_data_flooding(X_raw_scaled, features, augment_factor=aug_factor)
     else:
         print("   -> Standard Training Mode (No Physics Guidance).")
