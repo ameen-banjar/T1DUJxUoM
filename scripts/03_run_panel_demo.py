@@ -17,7 +17,6 @@ MODEL_DIR = os.path.join(BASE_DIR, "pretrained_models")
 OUT_DIR = os.path.join(BASE_DIR, "outputs", "panel_demo")
 os.makedirs(OUT_DIR, exist_ok=True)
 
-# Define Model Class (Must match training script)
 class LSTMRegressor(nn.Module):
     def __init__(self, input_dim):
         super().__init__()
@@ -52,19 +51,14 @@ def run_panel():
         print("Error: Model files not found. Run '02_train_model.py' first.")
         return
 
-    # 2. Setup Baseline Sequence (Fasting State)
+    # 2. Setup Baseline
     seq_len = 72
-    # Create a flat baseline sequence
     base_seq = np.zeros((1, seq_len, len(features)))
-    
-    # Map feature names to indices
     feat_map = {k:i for i,k in enumerate(features)}
-    
-    # Set default physiological values
     base_seq[:, :, feat_map["glucose_mgdl"]] = 120 
     base_seq[:, :, feat_map["heart_rate"]] = 80
     
-    # 3. Define Scenarios (The Panel)
+    # 3. Define Scenarios
     scenarios = {
         "A_Baseline (Fasting)": {"carb": 0, "ins": 0},
         "B_Meal_NoBolus":       {"carb": 60, "ins": 0},
@@ -74,36 +68,45 @@ def run_panel():
     
     plt.figure(figsize=(10, 6))
     
-    # 4. Run Simulation Loop
+    # قائمة لحفظ النتائج الرقمية
+    results_data = [] 
+
+    # 4. Simulation Loop
     for name, params in scenarios.items():
         curr_seq = base_seq.copy()
         preds = []
         
-        # Inject Event at the last timestep of history
+        # Inject Event
         curr_seq[0, -1, feat_map["input_meal_carbs"]] = params["carb"]
         curr_seq[0, -1, feat_map["input_insulin"]] = params["ins"]
         
-        # Forecast loop (Autoregressive)
-        for _ in range(48): # Forecast 4 hours (48 * 5min)
-            # Transform input
+        # Forecast
+        for _ in range(48): # 4 hours
             in_tensor = torch.tensor(scaler.transform(curr_seq[0]), dtype=torch.float32).unsqueeze(0)
-            
             with torch.no_grad():
                 pred_scaled = model(in_tensor).item()
-            
-            # Record prediction
             preds.append(pred_scaled)
             
-            # Update State (Shift left)
+            # Update State
             new_step = curr_seq[0, -1].copy()
-            new_step[feat_map["glucose_mgdl"]] = pred_scaled # Update Glucose
-            new_step[feat_map["input_insulin"]] = 0 # Reset inputs
+            new_step[feat_map["glucose_mgdl"]] = pred_scaled
+            new_step[feat_map["input_insulin"]] = 0
             new_step[feat_map["input_meal_carbs"]] = 0
             
             curr_seq[0, :-1, :] = curr_seq[0, 1:, :]
             curr_seq[0, -1, :] = new_step
 
         plt.plot(preds, label=name, linewidth=2)
+        
+        # Save Metrics to List
+        results_data.append({
+            "Scenario": name,
+            "Input_Carbs": params["carb"],
+            "Input_Insulin": params["ins"],
+            "Min_Glucose_Scaled": min(preds),
+            "Max_Glucose_Scaled": max(preds),
+            "Final_Glucose_Scaled": preds[-1]
+        })
 
     # 5. Finalize Plot
     plt.title("Digital Twin Response (Scaled Glucose Units)")
@@ -112,9 +115,17 @@ def run_panel():
     plt.legend()
     plt.grid(True, alpha=0.3)
     
-    out_path = os.path.join(OUT_DIR, "clinical_results_demo.png")
-    plt.savefig(out_path)
-    print(f"Panel complete. Results saved to: {out_path}")
+    # Save Image
+    img_path = os.path.join(OUT_DIR, "clinical_results_demo.png")
+    plt.savefig(img_path)
+    print(f"   -> Plot saved to: {img_path}")
+    
+    # Save CSV
+    csv_path = os.path.join(OUT_DIR, "clinical_metrics_demo.csv")
+    pd.DataFrame(results_data).to_csv(csv_path, index=False)
+    print(f"   -> Metrics saved to: {csv_path}")
+    
+    print("✅ Panel Complete.")
 
 if __name__ == "__main__":
     run_panel()
