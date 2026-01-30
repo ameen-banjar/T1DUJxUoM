@@ -1,80 +1,75 @@
-import pandas as pd
-import numpy as np
 import os
+import sys
+import numpy as np
+import pandas as pd
 
-# Define Paths
+# Setup Paths
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUT_DIR = os.path.join(BASE_DIR, "data_demo")
-os.makedirs(OUT_DIR, exist_ok=True)
+DATA_DIR = os.path.join(BASE_DIR, "data_demo")
+os.makedirs(DATA_DIR, exist_ok=True)
+
+def simple_kernel(n, p):
+    """Creates a simple decay kernel for IOB/COB estimation."""
+    k = np.zeros(n)
+    k[:p] = np.linspace(0, 1, p)
+    k[p:] = np.linspace(1, 0, n-p)
+    return k / k.sum() if k.sum() > 0 else k
 
 def generate_demo_data():
-    print("Generating BALANCED synthetic demo data...")
+    print("Generating physics-ready synthetic demo data...")
     
-    # Time settings
-    n_days = 14
-    steps = n_days * 288 # 5 min intervals
-    dates = pd.date_range("2024-01-01", periods=steps, freq="5min")
+    # 1. Create Time Index (14 Days)
+    # 5-minute intervals
+    dates = pd.date_range("2024-01-01", periods=14*288, freq="5min")
+    steps = len(dates)
     
-    # --- Modification: Simulate a controlled but varied patient ---
-    
-    # 1. Base Glucose with Daily Cycle (Targeting ~120 mg/dL)
+    # 2. Simulate Base Glucose (Daily Sine Wave)
+    # Oscillates between ~120 and ~160
     day_cycle = np.sin(2 * np.pi * dates.hour / 24)
-    base_glucose = 130 + (15 * day_cycle) 
+    glucose = 140 + (20 * day_cycle) + np.random.normal(0, 5, steps)
     
-    # 2. Add Noise (Short term volatility)
-    noise = np.random.normal(0, 5, steps)
-    
-    # 3. Meals & Spikes (Adding Gaussian bumps)
-    meal_spikes = np.zeros(steps)
-    insulin = np.zeros(steps)
+    # 3. Simulate Meals & Insulin Events
     carbs = np.zeros(steps)
+    insulin = np.zeros(steps)
     
-    # Random meal simulation
-    for i in range(0, steps, 60): # Approx every 5 hours
-        if np.random.rand() > 0.3: # 70% chance of meal
-            meal_size = np.random.choice([30, 50, 70])
-            carbs[i] = meal_size
-            insulin[i] = meal_size * 0.1 # Standard bolus
+    # Randomly inject meals approx every 5 hours
+    for i in range(0, steps, 60): 
+        if np.random.rand() > 0.3:
+            carbs[i] = 50  # 50g Carb Meal
+            insulin[i] = 5 # 5U Insulin
             
-            # Simulate meal impact (2-3 hours rise)
-            end = min(steps, i + 36)
-            t_range = np.linspace(-2, 2, end-i)
-            bump = np.exp(-t_range**2) * (meal_size * 0.8) 
-            meal_spikes[i:end] += bump
+            # Add physiological response (Rise then Fall)
+            # This helps the model learn basic dynamics even before augmentation
+            if i + 72 < steps:
+                glucose[i:i+36] += np.linspace(0, 40, 36) 
+                glucose[i+36:i+72] -= np.linspace(0, 40, 36)
 
-    # 4. Combine: Base + Meals + Noise
-    glucose = base_glucose + meal_spikes + noise
-    
-    # 5. Safety Bounds (To prevent unrealistic values)
-    glucose = np.clip(glucose, 60, 300)
-    
-    # Construct DataFrame
+    # 4. Construct DataFrame
     df = pd.DataFrame({
         "time": dates,
-        "datetime_local": dates,
-        "output_cgm": glucose, 
+        "glucose_mgdl": np.clip(glucose, 40, 400),
         "input_insulin": insulin,
         "input_meal_carbs": carbs,
         "heart_rate": np.random.normal(80, 5, steps),
         "steps": np.random.choice([0, 100], p=[0.9, 0.1], size=steps),
-        "sleep_efficiency": 0,
-        "feat_hour_of_day_sin": np.sin(2 * np.pi * dates.hour / 24),
-        "feat_hour_of_day_cos": np.cos(2 * np.pi * dates.hour / 24),
-        "feat_is_weekend": dates.dayofweek.isin([5,6]).astype(int),
-        "heart_rate_WRTbaseline": 0,
-        "is_train": 1 
+        "sleep_efficiency": 0.0,
+        "is_train": 1
     })
     
-    # Approx IOB/COB calculations
-    df["IOB_U"] = df["input_insulin"].rolling(60, min_periods=1).sum() * 0.9 
-    df["COB_g"] = df["input_meal_carbs"].rolling(36, min_periods=1).sum() * 0.8
-    
-    out_path = os.path.join(OUT_DIR, "demo_patient.csv")
+    # 5. Feature Engineering (Must match training requirements)
+    df["feat_hour_of_day_sin"] = np.sin(2 * np.pi * dates.hour / 24)
+    df["feat_hour_of_day_cos"] = np.cos(2 * np.pi * dates.hour / 24)
+    df["feat_is_weekend"] = dates.dayofweek.isin([5,6]).astype(int)
+    df["heart_rate_WRTbaseline"] = 0.0
+
+    # Calculate approximate IOB (Insulin On Board) and COB (Carbs On Board)
+    df["IOB_U"] = np.convolve(df["input_insulin"], simple_kernel(60, 15), mode='full')[:steps]
+    df["COB_g"] = np.convolve(df["input_meal_carbs"], simple_kernel(36, 12), mode='full')[:steps]
+
+    # Save to CSV
+    out_path = os.path.join(DATA_DIR, "demo_patient.csv")
     df.to_csv(out_path, index=False)
-    print(f"? Success! Balanced demo data created at: {out_path}")
-    
-    # Use numpy mean to avoid index error
-    print(f"   Mean Glucose: {np.mean(glucose):.1f} mg/dL (Target: ~130-140)")
+    print(f"Done. Demo data saved to: {out_path}")
 
 if __name__ == "__main__":
     generate_demo_data()
