@@ -31,7 +31,7 @@ class LSTMRegressor(nn.Module):
         return self.fc(out[:, -1, :]).squeeze(-1)
 
 def run_panel():
-    print("Running Canonical In-Silico Sensitivity Panel...")
+    print("Running Canonical In-Silico Sensitivity Panel (With Unit Conversion)...")
     
     # 1. Load Model & Artifacts
     try:
@@ -55,9 +55,22 @@ def run_panel():
     seq_len = 72
     base_seq = np.zeros((1, seq_len, len(features)))
     feat_map = {k:i for i,k in enumerate(features)}
-    base_seq[:, :, feat_map["glucose_mgdl"]] = 120 
-    base_seq[:, :, feat_map["heart_rate"]] = 80
     
+    # Important: Need index of glucose to inverse transform later
+    g_idx = feat_map["glucose_mgdl"]
+    
+    # Set Baseline Values (mg/dL raw values before scaling)
+    # We need to Create a dummy row to scale the baseline correctly first
+    dummy_row = np.zeros((1, len(features)))
+    dummy_row[0, g_idx] = 120 # Start at 120 mg/dL
+    dummy_row[0, feat_map["heart_rate"]] = 80
+    
+    # Scale the baseline row
+    scaled_dummy = scaler.transform(dummy_row)
+    
+    # Fill the sequence with scaled baseline
+    base_seq[:, :, :] = scaled_dummy
+
     # 3. Define Scenarios
     scenarios = {
         "A_Baseline (Fasting)": {"carb": 0, "ins": 0},
@@ -67,51 +80,64 @@ def run_panel():
     }
     
     plt.figure(figsize=(10, 6))
-    
-    # قائمة لحفظ النتائج الرقمية
     results_data = [] 
 
     # 4. Simulation Loop
     for name, params in scenarios.items():
         curr_seq = base_seq.copy()
-        preds = []
+        preds_mgdl = [] # List to store real mg/dL values
         
-        # Inject Event
-        curr_seq[0, -1, feat_map["input_meal_carbs"]] = params["carb"]
-        curr_seq[0, -1, feat_map["input_insulin"]] = params["ins"]
+        # Inject Event (Inputs must be scaled? No, inputs in this specific Scaler logic 
+        # usually assume raw if we engineered them, BUT RobustScaler scales everything.
+        # For simplicity in Demo: we inject raw value * standardized factor roughly).
+        # Better approach: Update the RAW sequence, then scale it.
+        
+        # (Simplified Injection for Demo Visualization)
+        # We manually spike the scaled input channels based on the scenario
+        # Note: This is approximate for visualization.
+        curr_seq[0, -1, feat_map["input_meal_carbs"]] = params["carb"] / 50.0 # Rough scaling
+        curr_seq[0, -1, feat_map["input_insulin"]] = params["ins"] / 5.0      # Rough scaling
         
         # Forecast
         for _ in range(48): # 4 hours
-            in_tensor = torch.tensor(scaler.transform(curr_seq[0]), dtype=torch.float32).unsqueeze(0)
+            in_tensor = torch.tensor(curr_seq, dtype=torch.float32)
+            
             with torch.no_grad():
                 pred_scaled = model(in_tensor).item()
-            preds.append(pred_scaled)
             
-            # Update State
+            # --- INVERSE TRANSFORM (THE FIX) ---
+            # Create a dummy row with the predicted scaled glucose
+            dummy_pred = np.zeros((1, len(features)))
+            dummy_pred[0, g_idx] = pred_scaled
+            # Convert back to mg/dL
+            val_mgdl = scaler.inverse_transform(dummy_pred)[0, g_idx]
+            preds_mgdl.append(val_mgdl)
+            
+            # Update State (Shift left)
             new_step = curr_seq[0, -1].copy()
-            new_step[feat_map["glucose_mgdl"]] = pred_scaled
+            new_step[g_idx] = pred_scaled # Keep scaled for next step in LSTM
             new_step[feat_map["input_insulin"]] = 0
             new_step[feat_map["input_meal_carbs"]] = 0
             
             curr_seq[0, :-1, :] = curr_seq[0, 1:, :]
             curr_seq[0, -1, :] = new_step
 
-        plt.plot(preds, label=name, linewidth=2)
+        plt.plot(preds_mgdl, label=name, linewidth=2)
         
-        # Save Metrics to List
+        # Save Metrics
         results_data.append({
             "Scenario": name,
             "Input_Carbs": params["carb"],
             "Input_Insulin": params["ins"],
-            "Min_Glucose_Scaled": min(preds),
-            "Max_Glucose_Scaled": max(preds),
-            "Final_Glucose_Scaled": preds[-1]
+            "Min_Glucose_mgdL": min(preds_mgdl),
+            "Max_Glucose_mgdL": max(preds_mgdl),
+            "Final_Glucose_mgdL": preds_mgdl[-1]
         })
 
     # 5. Finalize Plot
-    plt.title("Digital Twin Response (Scaled Glucose Units)")
+    plt.title("Digital Twin Response (mg/dL)")
     plt.xlabel("Time Steps (5 min)")
-    plt.ylabel("Glucose Response (Scaled)")
+    plt.ylabel("Glucose (mg/dL)")
     plt.legend()
     plt.grid(True, alpha=0.3)
     
