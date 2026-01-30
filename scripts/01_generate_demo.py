@@ -4,7 +4,12 @@ import numpy as np
 import pandas as pd
 
 # Setup Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# Use try-except to handle Jupyter/Script context differences
+try:
+    BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+except NameError:
+    BASE_DIR = os.getcwd()
+
 DATA_DIR = os.path.join(BASE_DIR, "data_demo")
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -24,8 +29,8 @@ def generate_demo_data():
     steps = len(dates)
     
     # 2. Simulate Base Glucose (Daily Sine Wave)
-    # Oscillates between ~120 and ~160
-    day_cycle = np.sin(2 * np.pi * dates.hour / 24)
+    # FIX: Added .values to ensure we work with a mutable numpy array, not a pandas Index
+    day_cycle = np.sin(2 * np.pi * dates.hour.values / 24)
     glucose = 140 + (20 * day_cycle) + np.random.normal(0, 5, steps)
     
     # 3. Simulate Meals & Insulin Events
@@ -39,8 +44,9 @@ def generate_demo_data():
             insulin[i] = 5 # 5U Insulin
             
             # Add physiological response (Rise then Fall)
-            # This helps the model learn basic dynamics even before augmentation
             if i + 72 < steps:
+                # This line caused the error before because 'glucose' was immutable.
+                # Now it is a numpy array, so this works:
                 glucose[i:i+36] += np.linspace(0, 40, 36) 
                 glucose[i+36:i+72] -= np.linspace(0, 40, 36)
 
