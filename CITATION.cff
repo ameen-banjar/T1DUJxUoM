@@ -1,0 +1,106 @@
+cff-version: 1.2.0
+message: "If you use T1DUJxUoM in academic work, please cite the archived software release and the source-code repository using the metadata below."
+
+title: "T1DUJxUoM: Cohort-Fair Multimodal Digital Twins for Type 1 Diabetes"
+type: software
+
+abstract: "T1DUJxUoM is a reproducible research software package for evaluating physics-guided, multi-horizon digital twin models for Type 1 Diabetes. The package includes code, configuration files, pretrained/demo artefacts, and in-silico counterfactual evaluation protocols designed to assess autoregressive glucose forecasting, insulin-carbohydrate responsiveness, and physiologically plausible model behaviour under clinically relevant perturbation scenarios."
+
+authors:
+  - family-names: "Ibrahim"
+    given-names: "Ahmed"
+    affiliation: "Department of Computer Science and Artificial Intelligence, College of Computer Science and Engineering, University of Jeddah, Jeddah, Saudi Arabia"
+
+  - family-names: "Banjar"
+    given-names: "Ameen"
+    affiliation: "Department of Information Systems and Technology, College of Computer Science and Engineering, University of Jeddah, Jeddah, Saudi Arabia"
+
+  - family-names: "Harper"
+    given-names: "Simon"
+    affiliation: "University of Manchester, Manchester, United Kingdom"
+
+  - family-names: "Alarood"
+    given-names: "Ala"
+    affiliation: "Department of Information Technology, College of Computer Science and Engineering, University of Jeddah, Jeddah, Saudi Arabia"
+
+  - family-names: "Alsolami"
+    given-names: "Eesa"
+    affiliation: "Department of Cybersecurity, College of Computer Science and Engineering, University of Jeddah, Jeddah, Saudi Arabia"
+
+contact:
+  - family-names: "Banjar"
+    given-names: "Ameen"
+    affiliation: "University of Jeddah"
+    email: "abanjar@uj.edu.sa"
+
+version: "3.0.0"
+date-released: "2026-01-30"
+
+license: MIT
+
+repository-code: "https://github.com/ameen-banjar/T1DUJxUoM"
+repository-artifact: "https://zenodo.org/records/18434352"
+url: "https://doi.org/10.5281/zenodo.18434352"
+
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.18434352
+    description: "Versioned DOI for the archived T1DUJxUoM software release v3.0.0 on Zenodo."
+
+  - type: url
+    value: "https://github.com/ameen-banjar/T1DUJxUoM"
+    description: "Public source-code repository for the T1DUJxUoM reproducibility package."
+
+keywords:
+  - "type 1 diabetes"
+  - "digital twin"
+  - "continuous glucose monitoring"
+  - "glucose forecasting"
+  - "multi-horizon prediction"
+  - "LSTM"
+  - "physics-guided machine learning"
+  - "counterfactual evaluation"
+  - "in-silico trial"
+  - "autoregressive rollout"
+  - "insulin-carbohydrate dynamics"
+  - "reproducible research"
+
+references:
+  - type: software
+    title: "T1D-UOM – A Longitudinal Multimodal Dataset of Type 1 Diabetes"
+    authors:
+      - family-names: "Alsuhaymi"
+        given-names: "Ashwaq"
+      - family-names: "Bilal"
+        given-names: "Ahmad"
+      - family-names: "Gasca Garcia"
+        given-names: "Daniel"
+      - family-names: "Kongdee"
+        given-names: "Rujiravee"
+      - family-names: "Lubasinski"
+        given-names: "Nicole"
+      - family-names: "Hood"
+        given-names: "Thabit"
+      - family-names: "Paul"
+        given-names: "Nutter"
+      - family-names: "Harper"
+        given-names: "Simon"
+    doi: 10.5281/zenodo.15169264
+    repository-code: "https://github.com/sharpic/ManchesterCSCoordinatedDiabetesStudy"
+    version: "V1.0.1"
+    date-released: "2025-04-07"
+
+  - type: article
+    title: "Software citation principles"
+    authors:
+      - family-names: "Smith"
+        given-names: "Arfon M."
+      - family-names: "Katz"
+        given-names: "Daniel S."
+      - family-names: "Niemeyer"
+        given-names: "Kyle E."
+      - name: "FORCE11 Software Citation Working Group"
+    doi: 10.7717/peerj-cs.86
+    journal: "PeerJ Computer Science"
+    volume: 2
+    year: 2016
