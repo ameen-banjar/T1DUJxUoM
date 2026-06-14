@@ -39,13 +39,17 @@ date-released: "2026-06-14"
 license: MIT
 
 repository-code: "https://github.com/ameen-banjar/T1DUJxUoM"
-repository-artifact: ""
-url: ""
+repository-artifact: "https://zenodo.org/records/20693048"
+url: "https://doi.org/10.5281/zenodo.20693048"
 
 identifiers:
   - type: url
     value: "https://github.com/ameen-banjar/T1DUJxUoM"
     description: "Public source-code repository for the T1DUJxUoM reproducibility package."
+
+  - type: doi
+    value: 10.5281/zenodo.20693048
+    description: "Versioned DOI for the archived T1DUJxUoM software release v4.0.0 on Zenodo, corresponding to the results in the current paper."
 
   - type: doi
     value: 10.5281/zenodo.18434352

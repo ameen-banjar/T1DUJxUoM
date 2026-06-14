@@ -3,6 +3,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![Paper Status](https://img.shields.io/badge/Paper-Under_Review-orange.svg)](https://github.com/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20693048.svg)](https://doi.org/10.5281/zenodo.20693048)
 
 **Authors:**
 - **Ameen Banjar** (University of Jeddah, Saudi Arabia)
@@ -86,7 +87,7 @@ mechanics can be verified end-to-end without access to the private dataset.
 
 ## Citation
 
-If you use this code, please cite the archived release (DOI to be added on publication) and the
+If you use this code, please cite the archived release (DOI [10.5281/zenodo.20693048](https://doi.org/10.5281/zenodo.20693048), v4.0.0) and the
 paper. The earlier `T1DUJxUoM` v3.0.0 release (DOI [10.5281/zenodo.18434352](https://doi.org/10.5281/zenodo.18434352))
 corresponds to a superseded analysis and should **not** be cited as supporting the results in the
 current paper.
