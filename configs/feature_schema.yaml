@@ -1,28 +1,66 @@
 schema:
-  name: T1DUJxUoM_FeatureSchema_2301
-  version: 1.0.0
+  name: T1DUJxUoM_FeatureSchema_v2
+  version: 2.0.0
 
 timebase:
   step_minutes: 5
   seq_len_steps: 72
+  roll_steps: 24
 
 target:
   name: glucose_mgdl
-  scaler_stats:
-    mean: 149.7158
-    std: 49.4592
+  prediction_mode: "direct"   # model output IS the scaled glucose prediction
 
-features:
+# Base ("FullCore") 8-feature set used by FullCore / Vanilla / NoMask / NoMono / Enriched (base part)
+core_features:
   feature_order:
     - glucose_mgdl
-    - input_insulin
-    - input_meal_carbs
-    - IOB_U
+    - Bolus_IOB
+    - Basal_Rate
+    - meal_carbs_g
     - COB_g
+    - tod_sin
+    - tod_cos
+    - is_weekend
+
+# NoIOB ablation: Bolus_IOB replaced by Raw_Bolus (no IOB decay model)
+noiob_features:
+  feature_order:
+    - glucose_mgdl
+    - Raw_Bolus
+    - Basal_Rate
+    - meal_carbs_g
+    - COB_g
+    - tod_sin
+    - tod_cos
+    - is_weekend
+
+# NoCOB ablation: COB_g removed
+nocob_features:
+  feature_order:
+    - glucose_mgdl
+    - Bolus_IOB
+    - Basal_Rate
+    - meal_carbs_g
+    - tod_sin
+    - tod_cos
+    - is_weekend
+
+# Enriched: core_features + wearable channels (10/13 patients only)
+enriched_features:
+  feature_order:
+    - glucose_mgdl
+    - Bolus_IOB
+    - Basal_Rate
+    - meal_carbs_g
+    - COB_g
+    - tod_sin
+    - tod_cos
+    - is_weekend
     - heart_rate
     - steps
     - sleep_efficiency
-    - feat_hour_of_day_sin
-    - feat_hour_of_day_cos
-    - feat_is_weekend
-    - heart_rate_WRTbaseline
+
+cohorts:
+  core_patients: ["2301", "2302", "2304", "2305", "2306", "2307", "2308", "2309", "2313", "2314", "2401", "2403", "2405"]
+  enriched_patients: ["2301", "2302", "2304", "2306", "2307", "2308", "2309", "2313", "2401", "2405"]

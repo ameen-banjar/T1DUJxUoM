@@ -1,1 +1,1 @@
-{"patient_id": "DEMO", "feature_cols": ["glucose_mgdl", "input_insulin", "input_meal_carbs", "IOB_U", "COB_g", "heart_rate", "steps", "sleep_efficiency", "feat_hour_of_day_sin", "feat_hour_of_day_cos", "feat_is_weekend", "heart_rate_WRTbaseline"], "y_mean": 139.97570192305577, "y_std": 25.880873426789528}
+{"config": "FullCore", "feature_cols": ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"], "seq_len": 72, "best_val_rmse": 6.811074256896973, "best_test_rmse": 9.347846031188965}

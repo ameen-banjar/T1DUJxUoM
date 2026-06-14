@@ -1,10 +1,7 @@
 import os
-import sys
 import numpy as np
 import pandas as pd
 
-# Setup Paths
-# Use try-except to handle Jupyter/Script context differences
 try:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
@@ -13,69 +10,61 @@ except NameError:
 DATA_DIR = os.path.join(BASE_DIR, "data_demo")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-def simple_kernel(n, p):
-    """Creates a simple decay kernel for IOB/COB estimation."""
-    k = np.zeros(n)
-    k[:p] = np.linspace(0, 1, p)
-    k[p:] = np.linspace(1, 0, n-p)
-    return k / k.sum() if k.sum() > 0 else k
+IOB_DECAY = np.exp(-5.0 / 180.0)
+COB_DECAY = np.exp(-5.0 / 120.0)
+
 
 def generate_demo_data():
-    print("Generating physics-ready synthetic demo data...")
-    
-    # 1. Create Time Index (14 Days)
-    # 5-minute intervals
-    dates = pd.date_range("2024-01-01", periods=14*288, freq="5min")
+    """Synthetic data with the same 8-column FullCore schema used by the
+    real-data pipeline (glucose_mgdl, Bolus_IOB, Basal_Rate, meal_carbs_g,
+    COB_g, tod_sin, tod_cos, is_weekend), so 02_train_model.py and
+    03_run_panel_demo.py exercise the real architecture/loss end-to-end."""
+    print("Generating synthetic demo data with the FullCore feature schema...")
+
+    dates = pd.date_range("2024-01-01", periods=14 * 288, freq="5min")
     steps = len(dates)
-    
-    # 2. Simulate Base Glucose (Daily Sine Wave)
-    # FIX: Added .values to ensure we work with a mutable numpy array, not a pandas Index
+
     day_cycle = np.sin(2 * np.pi * dates.hour.values / 24)
     glucose = 140 + (20 * day_cycle) + np.random.normal(0, 5, steps)
-    
-    # 3. Simulate Meals & Insulin Events
-    carbs = np.zeros(steps)
-    insulin = np.zeros(steps)
-    
-    # Randomly inject meals approx every 5 hours
-    for i in range(0, steps, 60): 
-        if np.random.rand() > 0.3:
-            carbs[i] = 50  # 50g Carb Meal
-            insulin[i] = 5 # 5U Insulin
-            
-            # Add physiological response (Rise then Fall)
-            if i + 72 < steps:
-                # This line caused the error before because 'glucose' was immutable.
-                # Now it is a numpy array, so this works:
-                glucose[i:i+36] += np.linspace(0, 40, 36) 
-                glucose[i+36:i+72] -= np.linspace(0, 40, 36)
 
-    # 4. Construct DataFrame
+    bolus_iob = np.zeros(steps)
+    basal_rate = np.full(steps, 0.8)
+    meal_carbs = np.zeros(steps)
+    cob = np.zeros(steps)
+
+    for i in range(0, steps, 60):
+        if np.random.rand() > 0.3:
+            meal_carbs[i] = 50.0
+            bolus_iob[i] += 5.0
+            if i + 72 < steps:
+                glucose[i:i + 36] += np.linspace(0, 40, 36)
+                glucose[i + 36:i + 72] -= np.linspace(0, 40, 36)
+
+    for t in range(1, steps):
+        bolus_iob[t] = bolus_iob[t - 1] * IOB_DECAY + bolus_iob[t]
+        cob[t] = cob[t - 1] * COB_DECAY + meal_carbs[t]
+
+    angle = 2 * np.pi * (dates.hour.values * 60 + dates.minute.values) / (24 * 60)
+    tod_sin = np.sin(angle)
+    tod_cos = np.cos(angle)
+    is_weekend = dates.dayofweek.isin([5, 6]).astype(int)
+
     df = pd.DataFrame({
         "time": dates,
         "glucose_mgdl": np.clip(glucose, 40, 400),
-        "input_insulin": insulin,
-        "input_meal_carbs": carbs,
-        "heart_rate": np.random.normal(80, 5, steps),
-        "steps": np.random.choice([0, 100], p=[0.9, 0.1], size=steps),
-        "sleep_efficiency": 0.0,
-        "is_train": 1
+        "Bolus_IOB": bolus_iob,
+        "Basal_Rate": basal_rate,
+        "meal_carbs_g": meal_carbs,
+        "COB_g": cob,
+        "tod_sin": tod_sin,
+        "tod_cos": tod_cos,
+        "is_weekend": is_weekend,
     })
-    
-    # 5. Feature Engineering (Must match training requirements)
-    df["feat_hour_of_day_sin"] = np.sin(2 * np.pi * dates.hour / 24)
-    df["feat_hour_of_day_cos"] = np.cos(2 * np.pi * dates.hour / 24)
-    df["feat_is_weekend"] = dates.dayofweek.isin([5,6]).astype(int)
-    df["heart_rate_WRTbaseline"] = 0.0
 
-    # Calculate approximate IOB (Insulin On Board) and COB (Carbs On Board)
-    df["IOB_U"] = np.convolve(df["input_insulin"], simple_kernel(60, 15), mode='full')[:steps]
-    df["COB_g"] = np.convolve(df["input_meal_carbs"], simple_kernel(36, 12), mode='full')[:steps]
-
-    # Save to CSV
     out_path = os.path.join(DATA_DIR, "demo_patient.csv")
     df.to_csv(out_path, index=False)
     print(f"Done. Demo data saved to: {out_path}")
+
 
 if __name__ == "__main__":
     generate_demo_data()

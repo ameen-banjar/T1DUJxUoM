@@ -1,229 +1,197 @@
+"""
+Training pipeline matching the real-data retrain_v3 pipeline (train_all.py),
+run here on the synthetic demo data (FullCore feature schema, 8 columns).
+
+  - 2-layer LSTM (hidden=128, dropout=0.2), DIRECT glucose prediction
+    (pred = model(x), trained against the scaled absolute glucose target)
+  - 60/20/20 chronological train/val/test split; StandardScaler fit on TRAIN only
+  - stochastic glucose masking (p_mask, p_apply)
+  - double-monotonicity loss: lam * (relu(pred(insulin*1.5) - pred(base))
+    + relu(pred(base) - pred(carbs*1.5))), base_pred via a separate forward pass
+  - Adam lr=1e-3, seed=42
+  - best checkpoint = lowest VAL rmse; report TEST rmse at that checkpoint
+
+Trains the "FullCore" configuration by default (set CONFIG_NAME below to any
+key in configs/train_config.yaml -> ablation_configs to try another arm).
+"""
 import os
-import sys
-import yaml
-import json  # <--- FIXED: Added missing import
-import joblib
+import pickle
+import random
 import numpy as np
 import pandas as pd
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, Dataset
-from sklearn.preprocessing import RobustScaler
+from sklearn.preprocessing import StandardScaler
 
-# --- SETUP PATHS ---
 try:
     BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 except NameError:
     BASE_DIR = os.getcwd()
 
-sys.path.append(BASE_DIR)
-
-# Load Configuration
-config_path = os.path.join(BASE_DIR, "configs", "train_config.yaml")
-if os.path.exists(config_path):
-    with open(config_path, 'r') as f: 
-        CONFIG = yaml.safe_load(f)
-else:
-    # Default config if file missing
-    CONFIG = {'training': {'physics_guided': True, 'mask_probability': 0.9, 'augmentation_factor': 10}}
-
 DATA_DIR = os.path.join(BASE_DIR, "data_demo")
 MODEL_DIR = os.path.join(BASE_DIR, "pretrained_models")
 os.makedirs(MODEL_DIR, exist_ok=True)
 
-# ---------------------------------------------------------
-# 1. PHYSICS-GUIDED AUGMENTATION (Counterfactual Data Flooding)
-# ---------------------------------------------------------
-def augment_data_flooding(X_scaled, features, augment_factor=10):
-    """
-    Implements the 'Counterfactual Data Flooding' technique.
-    It creates synthetic samples where Insulin guarantees a glucose drop,
-    and Carbs guarantee a glucose rise, overriding spurious correlations.
-    """
-    print(f"   -> Applying Physics-Guided Data Flooding (Factor={augment_factor})...")
-    
-    g_idx = features.index("glucose_mgdl")
-    ins_idx = features.index("input_insulin")
-    carb_idx = features.index("input_meal_carbs")
+SEED = 42
+SEQ_LEN = 72
+BATCH_SIZE = 256
+EPOCHS = 40
+LR = 1e-3
+PERTURB = 1.5
+DEVICE = "cpu"
+GLUCOSE_IDX = 0
 
-    # Target y is essentially the next glucose value (simplified)
-    y_scaled = X_scaled[:, g_idx].copy()
-    
-    # --- A. INSULIN FLOODING (Force Drop) ---
-    # Identify moments of high insulin activity (> 1.0 sigma)
-    ins_mask = X_scaled[:, ins_idx] > 1.0 
-    X_aug_ins = []
-    y_aug_ins = []
-    
-    if np.sum(ins_mask) > 0:
-        X_sel = X_scaled[ins_mask]
-        y_sel = y_scaled[ins_mask]
-        
-        # PHYSICS CONSTRAINT: Force target glucose DOWN by 2.0 std dev
-        y_forced = y_sel - 2.0 
-        
-        # Duplicate these corrected samples to "flood" the batch
-        X_aug_ins = np.tile(X_sel, (augment_factor, 1))
-        y_aug_ins = np.tile(y_forced, augment_factor)
+CONFIG_NAME = "FullCore"
+FEATURES = ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g",
+            "tod_sin", "tod_cos", "is_weekend"]
+INS_IDX, CARB_IDX = 1, 4
+P_MASK, P_APPLY, LAM = 0.60, 0.40, 0.10
 
-    # --- B. CARB FLOODING (Force Rise) ---
-    carb_mask = X_scaled[:, carb_idx] > 1.0
-    X_aug_carb = []
-    y_aug_carb = []
-    
-    if np.sum(carb_mask) > 0:
-        X_sel = X_scaled[carb_mask]
-        y_sel = y_scaled[carb_mask]
-        
-        # PHYSICS CONSTRAINT: Force target glucose UP by 2.0 std dev
-        y_forced = y_sel + 2.0 
-        
-        X_aug_carb = np.tile(X_sel, (augment_factor, 1))
-        y_aug_carb = np.tile(y_forced, augment_factor)
 
-    # --- C. MERGE DATA ---
-    list_X = [X_scaled]
-    list_y = [y_scaled]
-    
-    if len(X_aug_ins) > 0:
-        list_X.append(X_aug_ins)
-        list_y.append(y_aug_ins)
-        
-    if len(X_aug_carb) > 0:
-        list_X.append(X_aug_carb)
-        list_y.append(y_aug_carb)
-        
-    X_final = np.concatenate(list_X, axis=0)
-    y_final = np.concatenate(list_y, axis=0)
-    
-    return X_final, y_final
-
-# ---------------------------------------------------------
-# 2. PHYSICS-GUIDED DATASET (Stochastic Masking)
-# ---------------------------------------------------------
-class PhysicsGuidedDataset(Dataset):
-    def __init__(self, X, y, seq_len, mask_prob=0.0):
-        self.X = torch.tensor(X, dtype=torch.float32)
-        self.y = torch.tensor(y, dtype=torch.float32)
-        self.seq_len = seq_len
-        self.mask_prob = mask_prob
-        self.g_idx = 0 # Assuming glucose is the first feature
-
-    def __len__(self):
-        return len(self.X) - self.seq_len
-
-    def __getitem__(self, i):
-        x_seq = self.X[i:i+self.seq_len].clone()
-        y_val = self.y[i+self.seq_len]
-        
-        # --- STOCHASTIC GLUCOSE MASKING ---
-        # Randomly zero out the glucose history channel.
-        # This prevents the model from relying solely on autoregression.
-        if self.mask_prob > 0 and torch.rand(1).item() < self.mask_prob:
-            x_seq[:, self.g_idx] = 0.0
-            
-        return x_seq, y_val
-
-# ---------------------------------------------------------
-# 3. LSTM MODEL ARCHITECTURE
-# ---------------------------------------------------------
-class LSTMRegressor(nn.Module):
-    def __init__(self, input_dim):
+class CoreLSTM(nn.Module):
+    def __init__(self, n_features, hidden=128):
         super().__init__()
-        self.lstm = nn.LSTM(input_dim, 128, num_layers=2, batch_first=True)
-        self.fc = nn.Sequential(
-            nn.Linear(128, 64),
-            nn.ReLU(),
-            nn.Linear(64, 1)
-        )
+        self.lstm = nn.LSTM(n_features, hidden, num_layers=2, batch_first=True, dropout=0.2)
+        self.fc = nn.Linear(hidden, 1)
+
     def forward(self, x):
         out, _ = self.lstm(x)
-        return self.fc(out[:, -1, :]).squeeze(-1)
+        return self.fc(out[:, -1, :])
 
-# ---------------------------------------------------------
-# 4. TRAINING PIPELINE
-# ---------------------------------------------------------
+
+def make_windows(arr, seq_len):
+    X, y = [], []
+    for i in range(len(arr) - seq_len):
+        X.append(arr[i:i + seq_len])
+        y.append(arr[i + seq_len, GLUCOSE_IDX])
+    return np.array(X, dtype=np.float32), np.array(y, dtype=np.float32)
+
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
+
+def rmse_eval(model, X_t, y_mgdl, g_mean, g_scale):
+    model.eval()
+    with torch.no_grad():
+        pred_scaled = model(X_t).squeeze(-1)
+    preds_mgdl = pred_scaled.cpu().numpy() * g_scale + g_mean
+    return np.sqrt(np.mean((preds_mgdl - y_mgdl) ** 2))
+
+
 def train_pipeline():
-    print("Starting Physics-Guided Training Pipeline...")
-    
-    # 1. Load Data
+    set_seed(SEED)
+    print(f"Starting training pipeline: config={CONFIG_NAME}")
+
     csv_path = os.path.join(DATA_DIR, "demo_patient.csv")
     if not os.path.exists(csv_path):
         print("Error: demo_patient.csv not found. Please run '01_generate_demo.py' first.")
         return
-    
+
     df = pd.read_csv(csv_path)
-    
-    features = [
-        "glucose_mgdl", "input_insulin", "input_meal_carbs", 
-        "IOB_U", "COB_g", "heart_rate", "steps", 
-        "sleep_efficiency", "feat_hour_of_day_sin", 
-        "feat_hour_of_day_cos", "feat_is_weekend", "heart_rate_WRTbaseline"
-    ]
-    
-    # 2. Scale Data
-    scaler = RobustScaler()
-    X_raw_scaled = scaler.fit_transform(df[features].values)
-    
-    # 3. Apply Physics Guidance (Flooding)
-    use_physics = CONFIG['training'].get('physics_guided', False)
-    
-    if use_physics:
-        aug_factor = CONFIG['training'].get('augmentation_factor', 10)
-        mask_p = CONFIG['training'].get('mask_probability', 0.5)
-        # Apply Flooding
-        X_train, y_train = augment_data_flooding(X_raw_scaled, features, augment_factor=aug_factor)
-    else:
-        print("   -> Standard Training Mode (No Physics Guidance).")
-        X_train = X_raw_scaled
-        y_train = X_raw_scaled[:, 0]
-        mask_p = 0.0
+    data = df[FEATURES].values.astype(np.float64)
+    n = len(data)
+    train_end = int(n * 0.60)
+    val_end = int(n * 0.80)
 
-    # 4. Create Dataset & Loader
-    ds = PhysicsGuidedDataset(X_train, y_train, seq_len=72, mask_prob=mask_p)
-    loader = DataLoader(ds, batch_size=64, shuffle=True)
-    
-    print(f"   -> Training on {len(ds)} sequences (Masking Probability: {mask_p:.2f})")
+    train_raw = data[:train_end]
+    val_raw = data[train_end:val_end]
+    test_raw = data[val_end:]
 
-    # 5. Initialize Model
-    model = LSTMRegressor(input_dim=len(features))
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    criterion = nn.MSELoss()
-    
-    # 6. Training Loop
-    epochs = 10 # Short training for demo purposes
-    model.train()
-    
-    for ep in range(epochs):
-        losses = []
-        for x, y in loader:
-            optimizer.zero_grad()
-            pred = model(x)
-            loss = criterion(pred, y)
+    scaler = StandardScaler().fit(train_raw)
+    train_s = scaler.transform(train_raw)
+    val_s = scaler.transform(val_raw)
+    test_s = scaler.transform(test_raw)
+
+    g_mean, g_scale = scaler.mean_[GLUCOSE_IDX], scaler.scale_[GLUCOSE_IDX]
+
+    Xtr, ytr = make_windows(train_s, SEQ_LEN)
+    Xval, yval = make_windows(val_s, SEQ_LEN)
+    Xtest, ytest = make_windows(test_s, SEQ_LEN)
+    print(f"   -> windows: train={len(Xtr)}, val={len(Xval)}, test={len(Xtest)}")
+
+    model = CoreLSTM(n_features=len(FEATURES)).to(DEVICE)
+    opt = torch.optim.Adam(model.parameters(), lr=LR)
+
+    Xval_t = torch.from_numpy(Xval).to(DEVICE)
+    yval_mgdl = yval * g_scale + g_mean
+    Xtest_t = torch.from_numpy(Xtest).to(DEVICE)
+    ytest_mgdl = ytest * g_scale + g_mean
+
+    best_val = float("inf")
+    best_test = None
+    best_state = None
+    n_train = len(Xtr)
+
+    for epoch in range(1, EPOCHS + 1):
+        model.train()
+        perm = np.random.permutation(n_train)
+        for start in range(0, n_train, BATCH_SIZE):
+            idx = perm[start:start + BATCH_SIZE]
+            xb = Xtr[idx].copy()
+            yb = ytr[idx]
+
+            if P_APPLY > 0 and np.random.rand() < P_APPLY:
+                keep = (np.random.rand(xb.shape[0], xb.shape[1]) > P_MASK).astype(np.float32)
+                xb[:, :, GLUCOSE_IDX] = xb[:, :, GLUCOSE_IDX] * keep
+
+            xb_t = torch.from_numpy(xb).to(DEVICE)
+            yb_t = torch.from_numpy(yb).to(DEVICE)
+
+            pred = model(xb_t).squeeze(-1)
+            mse = nn.functional.mse_loss(pred, yb_t)
+
+            if LAM > 0:
+                base_pred = model(xb_t).squeeze(-1)
+
+                xb_ins = xb_t.clone()
+                xb_ins[:, :, INS_IDX] = xb_ins[:, :, INS_IDX] * PERTURB
+                ins_pred = model(xb_ins).squeeze(-1)
+                l_ins = torch.relu(ins_pred - base_pred).mean()
+
+                xb_carbs = xb_t.clone()
+                xb_carbs[:, :, CARB_IDX] = xb_carbs[:, :, CARB_IDX] * PERTURB
+                carbs_pred = model(xb_carbs).squeeze(-1)
+                l_carbs = torch.relu(base_pred - carbs_pred).mean()
+
+                loss = mse + LAM * (l_ins + l_carbs)
+            else:
+                loss = mse
+
+            opt.zero_grad()
             loss.backward()
-            optimizer.step()
-            losses.append(loss.item())
-        
-        if (ep+1) % 2 == 0:
-            print(f"   Epoch {ep+1}/{epochs} | Loss: {np.mean(losses):.4f}")
+            opt.step()
 
-    # 7. Save Artifacts
-    print("Saving model artifacts...")
-    torch.save(model.state_dict(), os.path.join(MODEL_DIR, "model_demo.pt"))
-    joblib.dump(scaler, os.path.join(MODEL_DIR, "scaler_demo.pkl"))
-    
-    # Save Metadata for the Panel Script
+        val_rmse = rmse_eval(model, Xval_t, yval_mgdl, g_mean, g_scale)
+        if val_rmse < best_val:
+            best_val = val_rmse
+            best_test = rmse_eval(model, Xtest_t, ytest_mgdl, g_mean, g_scale)
+            best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+        if epoch % 5 == 0 or epoch == 1:
+            print(f"   Epoch {epoch:2d}/{EPOCHS} | val_rmse={val_rmse:.2f} | best_val={best_val:.2f}")
+
+    print(f"\nBest VAL rmse = {best_val:.2f} mg/dL, TEST rmse at that checkpoint = {best_test:.2f} mg/dL")
+
+    torch.save(best_state, os.path.join(MODEL_DIR, "model_demo.pt"))
+    with open(os.path.join(MODEL_DIR, "scaler_demo.pkl"), "wb") as f:
+        pickle.dump(scaler, f)
+
     meta = {
-        "patient_id": "DEMO",
-        "feature_cols": features,
-        "y_mean": float(df["glucose_mgdl"].mean()), 
-        "y_std": float(df["glucose_mgdl"].std())
+        "config": CONFIG_NAME,
+        "feature_cols": FEATURES,
+        "seq_len": SEQ_LEN,
+        "best_val_rmse": float(best_val),
+        "best_test_rmse": float(best_test),
     }
+    import json
     with open(os.path.join(MODEL_DIR, "meta_demo.json"), "w") as f:
         json.dump(meta, f)
-        
-    print("Done. Model ready for validation.")
+
+    print("Done. Model ready for the counterfactual scenario panel (03_run_panel_demo.py).")
+
 
 if __name__ == "__main__":
     train_pipeline()

@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use T1DUJxUoM in academic work, please cite the archived software release and the source-code repository using the metadata below."
 
-title: "T1DUJxUoM: Cohort-Fair Multimodal Digital Twins for Type 1 Diabetes"
+title: "T1DUJxUoM: Causal Plausibility versus Forecast Accuracy in Patient-Specific Type 1 Diabetes Digital Twins"
 type: software
 
-abstract: "T1DUJxUoM is a reproducible research software package for evaluating physics-guided, multi-horizon digital twin models for Type 1 Diabetes. The package includes code, configuration files, pretrained/demo artefacts, and in-silico counterfactual evaluation protocols designed to assess autoregressive glucose forecasting, insulin-carbohydrate responsiveness, and physiologically plausible model behaviour under clinically relevant perturbation scenarios."
+abstract: "T1DUJxUoM is the reproducibility companion for a retrained (60/20/20 chronological train/validation/test split) 7-arm ablation of physics-guided LSTM digital twins for Type 1 Diabetes. It includes the training pipeline (direct glucose prediction, stochastic glucose masking, double-monotonicity loss), evaluation scripts (multi-horizon rollout RMSE, naive-persistence baseline, insulin/carbohydrate dose-response, and an in-silico counterfactual safety panel), and configuration files needed to reproduce all tables and figures in the accompanying paper. It supersedes and replaces the results reported in the earlier T1DUJxUoM v3.0.0 release (10.5281/zenodo.18434352), which used a different evaluation split and is now superseded."
 
 authors:
   - family-names: "Ibrahim"
@@ -33,23 +33,23 @@ contact:
     affiliation: "University of Jeddah"
     email: "abanjar@uj.edu.sa"
 
-version: "3.0.0"
-date-released: "2026-01-30"
+version: "4.0.0"
+date-released: "2026-06-14"
 
 license: MIT
 
 repository-code: "https://github.com/ameen-banjar/T1DUJxUoM"
-repository-artifact: "https://zenodo.org/records/18434352"
-url: "https://doi.org/10.5281/zenodo.18434352"
+repository-artifact: ""
+url: ""
 
 identifiers:
-  - type: doi
-    value: 10.5281/zenodo.18434352
-    description: "Versioned DOI for the archived T1DUJxUoM software release v3.0.0 on Zenodo."
-
   - type: url
     value: "https://github.com/ameen-banjar/T1DUJxUoM"
     description: "Public source-code repository for the T1DUJxUoM reproducibility package."
+
+  - type: doi
+    value: 10.5281/zenodo.18434352
+    description: "DOI for the earlier (superseded) T1DUJxUoM v3.0.0 release; uses a different evaluation split and does not correspond to the results in the current paper."
 
 keywords:
   - "type 1 diabetes"

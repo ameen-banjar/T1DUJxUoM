@@ -1,10 +1,37 @@
 protocol:
-  warmup_minutes: 360
-  forecast_minutes: 360
+  seq_len_steps: 72        # 6h history window
+  horizon_steps: 24        # 2h autoregressive rollout
+  step_minutes: 5
 
+# Held-out TEST-segment fasting window selection criteria (see find_test_window):
+# last observed glucose in (100, 160) mg/dL, max Bolus_IOB < 0.5,
+# no carbs in the window, COB_g < 1.0, std(glucose) < 15.
+test_window_selection:
+  glucose_range_mgdl: [100, 160]
+  max_bolus_iob: 0.5
+  max_cob_g: 1.0
+  max_glucose_std: 15
+
+# In-silico counterfactual scenario panel
 scenarios:
-  A_Baseline: "No change"
-  B_Fasting: "Zero carbs, Zero bolus"
-  C_Meal50g_Bolus: "50g Carbs + Standard Bolus"
-  D_Meal50g_NoBolus: "50g Carbs + No Bolus (Missed)"
-  E_Meal50g_OverBolus: "50g Carbs + 1.5x Bolus (Overdose)"
+  A_Observed_Future_Baseline: "No perturbation (observed future exogenous trajectory)"
+  B_Unbolused_Meal: "+60g carbohydrate impulse, COB_g decays with tau=120 min, no insulin"
+  C_Dangerous_Overbolus: "+15U insulin impulse, Bolus_IOB decays with tau=180 min, no carbs"
+  D_Meal_Omitted_After_Insulin: "+10U insulin impulse, Bolus_IOB decays with tau=180 min, no carbs"
+
+decay_constants:
+  tau_insulin_minutes: 180
+  tau_carbs_minutes: 120
+
+safety_metrics:
+  - "Crossed70 (hypoglycaemia: nadir < 70 mg/dL)"
+  - "Crossed180 (hyperglycaemia: max > 180 mg/dL)"
+  - "Delta2h (glucose[+2h] - glucose[0h])"
+  - "Nadir (min glucose over rollout)"
+
+dose_response:
+  insulin_doses_U: [2, 4, 6, 10, 15]
+  carb_doses_g: [15, 30, 60, 90]
+  n_windows_per_patient: 10
+  seed: 42
+  delta_rel: "perturbed_glucose[+2h] - baseline_glucose[+2h] (treatment effect vs. no-perturbation counterfactual)"

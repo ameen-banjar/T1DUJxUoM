@@ -1,17 +1,65 @@
+data:
+  split: "60/20/20"   # chronological train/val/test, fit StandardScaler on TRAIN only
+  seq_len: 72          # 6h input window @ 5-min resolution
+  roll_steps: 24       # 2h autoregressive rollout for evaluation
+
 training:
-  batch_size: 64
+  batch_size: 256
   learning_rate: 0.001
-  epochs: 50
-  loss: "MSE"
+  epochs: 40
+  loss: "MSE + double-monotonicity penalty"
   optimizer: "Adam"
-  
-  # Physics-Guided Training Settings
-  physics_guided: true       # Enable the physics-based methodology
-  mask_probability: 0.90     # Glucose masking probability (The key secret)
-  augmentation_factor: 20    # Factor for physics-based data augmentation
+  seed: 42
+  checkpoint_selection: "lowest VAL rmse across all epochs; report TEST rmse at that checkpoint"
 
 model:
   type: "LSTM"
   hidden_dim: 128
   num_layers: 2
-  dropout: 0.1
+  dropout: 0.2
+  output: "direct"   # pred = model(x), trained against scaled absolute glucose target
+
+# 7-arm ablation. p_mask/p_apply control stochastic glucose-history masking;
+# lam is the weight of the double-monotonicity loss (perturb insulin x1.5 /
+# carbs x1.5 via a second forward pass and penalise the wrong-direction
+# prediction change).
+ablation_configs:
+  FullCore:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.60
+    p_apply: 0.40
+    lam: 0.10
+  Vanilla:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.0
+    p_apply: 0.0
+    lam: 0.0
+  NoMask:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.0
+    p_apply: 0.0
+    lam: 0.10
+  NoMono:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.60
+    p_apply: 0.40
+    lam: 0.0
+  NoIOB:
+    features: ["glucose_mgdl", "Raw_Bolus", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.60
+    p_apply: 0.40
+    lam: 0.10
+  NoCOB:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "tod_sin", "tod_cos", "is_weekend"]
+    p_mask: 0.60
+    p_apply: 0.40
+    lam: 0.10
+  Enriched:
+    features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend", "heart_rate", "steps", "sleep_efficiency"]
+    p_mask: 0.60
+    p_apply: 0.40
+    lam: 0.10
+
+monotonicity_loss:
+  perturb_factor: 1.5
+  formula: "MSE + lam * ( relu(pred(insulin*1.5) - pred(base)) + relu(pred(base) - pred(carbs*1.5)) )"
