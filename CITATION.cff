@@ -39,17 +39,22 @@ date-released: "2026-08-04"
 license: MIT
 
 repository-code: "https://github.com/ameen-banjar/T1DUJxUoM"
-repository-artifact: "https://zenodo.org/records/20693048"
-url: "https://doi.org/10.5281/zenodo.20693048"
+repository-artifact: "https://zenodo.org/records/21794825"
+url: "https://doi.org/10.5281/zenodo.21794825"
 
 identifiers:
   - type: url
     value: "https://github.com/ameen-banjar/T1DUJxUoM"
     description: "Public source-code repository for the T1DUJxUoM reproducibility package."
 
-  # TODO: add the v5.0.0 Zenodo DOI here once minted (GitHub release -> Zenodo archive),
-  # and update repository-artifact/url above to match. Do not cite v4.0.0 below for the
-  # current paper's results -- it corresponds to the pre-fix perturbation defect.
+  - type: doi
+    value: 10.5281/zenodo.21794825
+    description: "Versioned DOI for the archived T1DUJxUoM software release v5.0.0 on Zenodo, corresponding to the results in the current paper (raw-space perturbation fix, two-cohort/five-seed protocol)."
+
+  - type: doi
+    value: 10.5281/zenodo.18380841
+    description: "Concept DOI: always resolves to the latest archived version of T1DUJxUoM on Zenodo."
+
   - type: doi
     value: 10.5281/zenodo.20693048
     description: "Versioned DOI for the archived T1DUJxUoM software release v4.0.0 on Zenodo. Superseded by v5.0.0 (raw-space perturbation fix); do not cite for the current paper's results."
