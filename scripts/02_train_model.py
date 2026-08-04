@@ -106,6 +106,14 @@ def train_pipeline():
     test_s = scaler.transform(test_raw)
 
     g_mean, g_scale = scaler.mean_[GLUCOSE_IDX], scaler.scale_[GLUCOSE_IDX]
+    # Raw-space perturbation offset: multiplying the RAW feature by PERTURB
+    # (x' = PERTURB*x) corresponds, in standardised space, to
+    #   z' = PERTURB*z + (PERTURB-1)*mean/scale,
+    # not simply z' = PERTURB*z. Using the pure standardised-space scaling
+    # moves below-mean windows the WRONG way (can even flip IOB negative).
+    # See tests/test_perturbation.py for the regression test.
+    ins_off = (PERTURB - 1.0) * scaler.mean_[INS_IDX] / scaler.scale_[INS_IDX]
+    carb_off = (PERTURB - 1.0) * scaler.mean_[CARB_IDX] / scaler.scale_[CARB_IDX]
 
     Xtr, ytr = make_windows(train_s, SEQ_LEN)
     Xval, yval = make_windows(val_s, SEQ_LEN)
@@ -147,12 +155,12 @@ def train_pipeline():
                 base_pred = model(xb_t).squeeze(-1)
 
                 xb_ins = xb_t.clone()
-                xb_ins[:, :, INS_IDX] = xb_ins[:, :, INS_IDX] * PERTURB
+                xb_ins[:, :, INS_IDX] = xb_ins[:, :, INS_IDX] * PERTURB + ins_off
                 ins_pred = model(xb_ins).squeeze(-1)
                 l_ins = torch.relu(ins_pred - base_pred).mean()
 
                 xb_carbs = xb_t.clone()
-                xb_carbs[:, :, CARB_IDX] = xb_carbs[:, :, CARB_IDX] * PERTURB
+                xb_carbs[:, :, CARB_IDX] = xb_carbs[:, :, CARB_IDX] * PERTURB + carb_off
                 carbs_pred = model(xb_carbs).squeeze(-1)
                 l_carbs = torch.relu(base_pred - carbs_pred).mean()
 

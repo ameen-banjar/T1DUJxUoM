@@ -1,10 +1,10 @@
 cff-version: 1.2.0
 message: "If you use T1DUJxUoM in academic work, please cite the archived software release and the source-code repository using the metadata below."
 
-title: "T1DUJxUoM: Causal Plausibility versus Forecast Accuracy in Patient-Specific Type 1 Diabetes Digital Twins"
+title: "T1DUJxUoM: Forecasting Accuracy Is Not Enough — Safety-Oriented Evaluation of Neural Digital Twins Before In-Silico Insulin and Carbohydrate Intervention in Type 1 Diabetes"
 type: software
 
-abstract: "T1DUJxUoM is the reproducibility companion for a retrained (60/20/20 chronological train/validation/test split) 7-arm ablation of physics-guided LSTM digital twins for Type 1 Diabetes. It includes the training pipeline (direct glucose prediction, stochastic glucose masking, double-monotonicity loss), evaluation scripts (multi-horizon rollout RMSE, naive-persistence baseline, insulin/carbohydrate dose-response, and an in-silico counterfactual safety panel), and configuration files needed to reproduce all tables and figures in the accompanying paper. It supersedes and replaces the results reported in the earlier T1DUJxUoM v3.0.0 release (10.5281/zenodo.18434352), which used a different evaluation split and is now superseded."
+abstract: "T1DUJxUoM is the reproducibility companion for a six-configuration ablation of physiology-guided LSTM digital twins for Type 1 Diabetes, evaluated across two independent cohorts (University of Manchester T1D-UOM and OhioT1DM) and five random seeds under a strict 60/20/20 chronological train/validation/test split. It includes the training pipeline (direct glucose prediction, stochastic glucose masking, corrected raw-space double-monotonicity loss), evaluation scripts (multi-horizon rollout RMSE, naive-persistence and Ridge-AR baselines, insulin/carbohydrate dose-response audit, and an in-silico counterfactual scenario panel), a regression test guarding a previously fixed raw-space perturbation defect, and configuration files needed to reproduce the tables and figures in the accompanying paper. It supersedes and replaces the results reported in the earlier T1DUJxUoM v3.0.0 (10.5281/zenodo.18434352) and v4.0.0 (10.5281/zenodo.20693048) releases, which used a different evaluation split and, for v4.0.0, an implementation defect in the monotonicity-penalty perturbation later identified and corrected."
 
 authors:
   - family-names: "Ibrahim"
@@ -33,8 +33,8 @@ contact:
     affiliation: "University of Jeddah"
     email: "abanjar@uj.edu.sa"
 
-version: "4.0.0"
-date-released: "2026-06-14"
+version: "5.0.0"
+date-released: "2026-08-04"
 
 license: MIT
 
@@ -47,9 +47,12 @@ identifiers:
     value: "https://github.com/ameen-banjar/T1DUJxUoM"
     description: "Public source-code repository for the T1DUJxUoM reproducibility package."
 
+  # TODO: add the v5.0.0 Zenodo DOI here once minted (GitHub release -> Zenodo archive),
+  # and update repository-artifact/url above to match. Do not cite v4.0.0 below for the
+  # current paper's results -- it corresponds to the pre-fix perturbation defect.
   - type: doi
     value: 10.5281/zenodo.20693048
-    description: "Versioned DOI for the archived T1DUJxUoM software release v4.0.0 on Zenodo, corresponding to the results in the current paper."
+    description: "Versioned DOI for the archived T1DUJxUoM software release v4.0.0 on Zenodo. Superseded by v5.0.0 (raw-space perturbation fix); do not cite for the current paper's results."
 
   - type: doi
     value: 10.5281/zenodo.18434352
@@ -68,6 +71,9 @@ keywords:
   - "autoregressive rollout"
   - "insulin-carbohydrate dynamics"
   - "reproducible research"
+  - "OhioT1DM"
+  - "independent-cohort replication"
+  - "treatment-response plausibility"
 
 references:
   - type: software

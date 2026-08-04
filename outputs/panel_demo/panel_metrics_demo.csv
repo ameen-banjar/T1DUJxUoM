@@ -1,5 +1,5 @@
 Scenario,Start_Gluc,Delta_2h,Nadir,Max,Crossed70,Crossed180
-A: Observed Future (Baseline),128.3,-5.1,102.7,123.2,False,False
-B: Unbolused Meal (+60g Carbs),128.3,48.4,111.9,176.8,False,False
-C: Dangerous Overbolus (+15U Insulin),128.3,-2.6,106.2,125.8,False,False
-D: Meal Omitted After Insulin (+10U),128.3,-13.1,108.3,115.5,False,False
+A: Observed Future (Baseline),128.3,-7.4,103.3,121.0,False,False
+B: Unbolused Meal (+60g Carbs),128.3,53.7,115.0,182.1,False,True
+C: Dangerous Overbolus (+15U Insulin),128.3,-26.6,95.3,115.0,False,False
+D: Meal Omitted After Insulin (+10U),128.3,-32.2,95.8,115.0,False,False

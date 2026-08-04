@@ -19,10 +19,14 @@ model:
   dropout: 0.2
   output: "direct"   # pred = model(x), trained against scaled absolute glucose target
 
-# 7-arm ablation. p_mask/p_apply control stochastic glucose-history masking;
-# lam is the weight of the double-monotonicity loss (perturb insulin x1.5 /
-# carbs x1.5 via a second forward pass and penalise the wrong-direction
-# prediction change).
+# Six primary configurations (FullCore, Vanilla, NoMask, NoMono, NoIOB, NoCOB),
+# replicated across both cohorts and five seeds. Enriched is a separate,
+# Manchester-only, single-seed paired subgroup analysis (not part of the
+# primary six-configuration comparison). p_mask/p_apply control stochastic
+# glucose-history masking; lam is the weight of the double-monotonicity loss
+# (perturb insulin x1.5 / carbs x1.5, in RAW units -- see
+# tests/test_perturbation.py -- via a second forward pass, penalising the
+# wrong-direction prediction change).
 ablation_configs:
   FullCore:
     features: ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"]

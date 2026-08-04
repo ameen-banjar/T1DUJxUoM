@@ -1,1 +1,1 @@
-{"config": "FullCore", "feature_cols": ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"], "seq_len": 72, "best_val_rmse": 6.811074256896973, "best_test_rmse": 9.347846031188965}
+{"config": "FullCore", "feature_cols": ["glucose_mgdl", "Bolus_IOB", "Basal_Rate", "meal_carbs_g", "COB_g", "tod_sin", "tod_cos", "is_weekend"], "seq_len": 72, "best_val_rmse": 6.784433841705322, "best_test_rmse": 9.652709007263184}
